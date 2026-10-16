@@ -1,4 +1,4 @@
 ### Health check (сервер + MySQL)
-@baseUrl = http://localhost:5000/api
+@baseUrl = https://project-4sbx.onrender.com/api
 GET {{baseUrl}}/health
 Accept: application/json

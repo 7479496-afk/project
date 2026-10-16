@@ -1,4 +1,4 @@
-@baseUrl = http://localhost:5000/api
+@baseUrl = https://project-4sbx.onrender.com/api
 
 ### Login — Admin
 # @name loginAdmin
