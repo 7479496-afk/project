@@ -1,0 +1,76 @@
+@baseUrl = http://localhost:5000/api
+
+### Login as teacher
+# @name loginTeacher
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "teacher1@edu.local",
+  "password": "password123"
+}
+
+> {%
+  client.global.set("authToken", response.body.token);
+%}
+
+### List active lessons
+GET {{baseUrl}}/lessons?archived=0
+Authorization: Bearer {{authToken}}
+Accept: application/json
+
+### List archived lessons
+GET {{baseUrl}}/lessons?archived=1
+Authorization: Bearer {{authToken}}
+Accept: application/json
+
+### Create lesson
+# @name createLesson
+POST {{baseUrl}}/lessons
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "disciplineId": 1,
+  "groupId": 1,
+  "lessonDate": "2026-10-20",
+  "startTime": "09:00",
+  "endTime": "10:20",
+  "locationName": "Аудиторія 301",
+  "latitude": 50.4501,
+  "longitude": 30.5234,
+  "radiusMeters": 100
+}
+
+> {%
+  client.global.set("lessonId", response.body.lesson.id);
+%}
+
+### Update lesson
+PUT {{baseUrl}}/lessons/{{lessonId}}
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "disciplineId": 1,
+  "groupId": 1,
+  "lessonDate": "2026-10-21",
+  "startTime": "10:00",
+  "endTime": "11:20",
+  "locationName": "Аудиторія 302",
+  "latitude": 50.4501,
+  "longitude": 30.5234,
+  "radiusMeters": 120
+}
+
+### Archive lesson (залишається в статистиці)
+POST {{baseUrl}}/lessons/{{lessonId}}/archive
+Authorization: Bearer {{authToken}}
+
+### Unarchive lesson
+POST {{baseUrl}}/lessons/{{lessonId}}/unarchive
+Authorization: Bearer {{authToken}}
+
+### Delete lesson forever (прибирає зі статистики)
+DELETE {{baseUrl}}/lessons/{{lessonId}}
+Authorization: Bearer {{authToken}}
