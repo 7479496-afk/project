@@ -98,10 +98,6 @@ function parseLessonBody(body) {
     return { error: 'Час має бути у форматі ГГ:ХХ' };
   }
 
-  if (!locationName) {
-    return { error: 'Потрібна назва місця' };
-  }
-
   if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
     return { error: 'Потрібні широта і довгота' };
   }

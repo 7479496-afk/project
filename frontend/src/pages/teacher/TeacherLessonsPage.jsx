@@ -197,11 +197,11 @@ export default function TeacherLessonsPage() {
           </label>
 
           <label className="block text-sm font-medium text-ink">
-            Місце
+            Місце (необовʼязково)
             <input
               value={form.locationName}
               onChange={(event) => updateField('locationName', event.target.value)}
-              required
+              placeholder="Наприклад, аудиторія 301"
               className="mt-2 w-full rounded-lg border border-line px-3 py-2.5 outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
             />
           </label>
@@ -349,7 +349,8 @@ export default function TeacherLessonsPage() {
                     </p>
                     <p className="text-sm text-muted">
                       {lesson.lessonDate} · {lesson.startTime.slice(0, 5)}–
-                      {lesson.endTime.slice(0, 5)} · {lesson.locationName}
+                      {lesson.endTime.slice(0, 5)}
+                      {lesson.locationName ? ` · ${lesson.locationName}` : ''}
                     </p>
                   </div>
                   <Link

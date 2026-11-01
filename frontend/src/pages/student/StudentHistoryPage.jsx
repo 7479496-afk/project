@@ -50,7 +50,8 @@ export default function StudentHistoryPage() {
                   <p className="font-medium text-ink">{item.disciplineName}</p>
                   <p className="text-sm text-muted">
                     {item.lessonDate} · {String(item.startTime).slice(0, 5)}–
-                    {String(item.endTime).slice(0, 5)} · {item.locationName}
+                    {String(item.endTime).slice(0, 5)}
+                    {item.locationName ? ` · ${item.locationName}` : ''}
                   </p>
                   <p className="mt-1 text-xs text-muted">
                     Відмітка: {item.checkedInAt}

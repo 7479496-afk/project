@@ -167,7 +167,9 @@ export default function TeacherLessonDetailPage() {
                   {lesson.startTime.slice(0, 5)}–{lesson.endTime.slice(0, 5)}
                 </p>
                 <p className="mt-1 text-sm text-muted">
-                  {lesson.locationName} · радіус {lesson.radiusMeters} м
+                  {lesson.locationName
+                    ? `${lesson.locationName} · радіус ${lesson.radiusMeters} м`
+                    : `Радіус ${lesson.radiusMeters} м`}
                   {lesson.isArchived ? ' · в архіві' : ''}
                 </p>
               </div>
@@ -305,13 +307,13 @@ export default function TeacherLessonDetailPage() {
               </label>
 
               <label className="block text-sm font-medium text-ink">
-                Місце
+                Місце (необовʼязково)
                 <input
                   value={form.locationName}
                   onChange={(event) =>
                     updateField('locationName', event.target.value)
                   }
-                  required
+                  placeholder="Наприклад, аудиторія 301"
                   className="mt-2 w-full rounded-lg border border-line px-3 py-2.5 outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
                 />
               </label>
