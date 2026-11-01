@@ -80,10 +80,11 @@ export default function TeacherLessonDetailPage() {
         lessonDate: current.lessonDate,
         startTime: current.startTime.slice(0, 5),
         endTime: current.endTime.slice(0, 5),
-        locationName: current.locationName,
-        latitude: String(current.latitude),
-        longitude: String(current.longitude),
-        radiusMeters: String(current.radiusMeters),
+        locationName: current.locationName || '',
+        latitude: current.latitude == null ? '' : String(current.latitude),
+        longitude: current.longitude == null ? '' : String(current.longitude),
+        radiusMeters:
+          current.radiusMeters == null ? '' : String(current.radiusMeters),
       });
     } catch (err) {
       setError(err.message);
@@ -114,9 +115,10 @@ export default function TeacherLessonDetailPage() {
         startTime: form.startTime,
         endTime: form.endTime,
         locationName: form.locationName.trim(),
-        latitude: Number(form.latitude),
-        longitude: Number(form.longitude),
-        radiusMeters: Number(form.radiusMeters),
+        latitude: form.latitude.trim() === '' ? null : Number(form.latitude),
+        longitude: form.longitude.trim() === '' ? null : Number(form.longitude),
+        radiusMeters:
+          form.radiusMeters.trim() === '' ? null : Number(form.radiusMeters),
       });
       setLesson(data.lesson);
       setSuccess('Заняття оновлено');
@@ -194,9 +196,10 @@ export default function TeacherLessonDetailPage() {
                   {lesson.startTime.slice(0, 5)}–{lesson.endTime.slice(0, 5)}
                 </p>
                 <p className="mt-1 text-sm text-muted">
-                  {lesson.locationName
-                    ? `${lesson.locationName} · радіус ${lesson.radiusMeters} м`
-                    : `Радіус ${lesson.radiusMeters} м`}
+                  {lesson.locationName ? `${lesson.locationName} · ` : ''}
+                  {lesson.latitude != null && lesson.longitude != null
+                    ? `геоперевірка · радіус ${lesson.radiusMeters || 100} м`
+                    : 'без геоперевірки'}
                   {lesson.isArchived ? ' · в архіві' : ''}
                 </p>
               </div>
@@ -273,8 +276,9 @@ export default function TeacherLessonDetailPage() {
                     {attendances.map((item) => (
                       <li key={item.id} className="px-4 py-3">
                         <p className="font-medium text-ink">{item.studentName}</p>
-                        <p className="text-sm text-muted">
-                          {item.studentEmail} · {item.checkedInAt}
+                        <p className="text-sm text-muted">{item.studentEmail}</p>
+                        <p className="mt-1 text-sm text-ink">
+                          Час відмітки: {item.checkedInAt}
                         </p>
                       </li>
                     ))}
@@ -375,25 +379,25 @@ export default function TeacherLessonDetailPage() {
               </label>
 
               <label className="block text-sm font-medium text-ink">
-                Широта
+                Широта (необовʼязково)
                 <input
                   value={form.latitude}
                   onChange={(event) =>
                     updateField('latitude', event.target.value)
                   }
-                  required
+                  placeholder="Порожньо = без гео"
                   className="mt-2 w-full rounded-lg border border-line px-3 py-2.5 outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
                 />
               </label>
 
               <label className="block text-sm font-medium text-ink">
-                Довгота
+                Довгота (необовʼязково)
                 <input
                   value={form.longitude}
                   onChange={(event) =>
                     updateField('longitude', event.target.value)
                   }
-                  required
+                  placeholder="Порожньо = без гео"
                   className="mt-2 w-full rounded-lg border border-line px-3 py-2.5 outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
                 />
               </label>
@@ -407,7 +411,6 @@ export default function TeacherLessonDetailPage() {
                   onChange={(event) =>
                     updateField('radiusMeters', event.target.value)
                   }
-                  required
                   className="mt-2 w-full rounded-lg border border-line px-3 py-2.5 outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
                 />
               </label>

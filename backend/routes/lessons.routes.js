@@ -20,9 +20,10 @@ function toLesson(row) {
     startTime: String(row.start_time).slice(0, 8),
     endTime: String(row.end_time).slice(0, 8),
     locationName: row.location_name,
-    latitude: Number(row.latitude),
-    longitude: Number(row.longitude),
-    radiusMeters: Number(row.radius_meters),
+    latitude: row.latitude == null ? null : Number(row.latitude),
+    longitude: row.longitude == null ? null : Number(row.longitude),
+    radiusMeters:
+      row.radius_meters == null ? null : Number(row.radius_meters),
     qrToken: row.qr_token,
     isArchived: Boolean(row.is_archived),
     createdAt: row.created_at,
@@ -78,12 +79,14 @@ function parseLessonBody(body) {
   const startTimeRaw = String(body.startTime || '').trim();
   const endTimeRaw = String(body.endTime || '').trim();
   const locationName = String(body.locationName || '').trim();
-  const latitude = Number(body.latitude);
-  const longitude = Number(body.longitude);
-  const radiusMeters =
-    body.radiusMeters === undefined || body.radiusMeters === null
-      ? 100
-      : Number(body.radiusMeters);
+  const hasLatitude =
+    body.latitude !== null &&
+    body.latitude !== undefined &&
+    String(body.latitude).trim() !== '';
+  const hasLongitude =
+    body.longitude !== null &&
+    body.longitude !== undefined &&
+    String(body.longitude).trim() !== '';
 
   if (!Number.isInteger(disciplineId) || disciplineId <= 0) {
     return { error: 'Потрібно обрати дисципліну' };
@@ -104,12 +107,32 @@ function parseLessonBody(body) {
     return { error: 'Час має бути у форматі ГГ:ХХ' };
   }
 
-  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
-    return { error: 'Потрібні широта і довгота' };
-  }
+  let latitude = null;
+  let longitude = null;
+  let radiusMeters = null;
 
-  if (!Number.isInteger(radiusMeters) || radiusMeters <= 0) {
-    return { error: 'Радіус має бути додатним цілим числом' };
+  if (hasLatitude || hasLongitude) {
+    if (!hasLatitude || !hasLongitude) {
+      return { error: 'Потрібні і широта, і довгота — або залиште обидві порожніми' };
+    }
+
+    latitude = Number(body.latitude);
+    longitude = Number(body.longitude);
+
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+      return { error: 'Широта і довгота мають бути числами' };
+    }
+
+    radiusMeters =
+      body.radiusMeters === undefined ||
+      body.radiusMeters === null ||
+      String(body.radiusMeters).trim() === ''
+        ? 100
+        : Number(body.radiusMeters);
+
+    if (!Number.isInteger(radiusMeters) || radiusMeters <= 0) {
+      return { error: 'Радіус має бути додатним цілим числом' };
+    }
   }
 
   const startTime = normalizeTime(startTimeRaw);

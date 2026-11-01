@@ -143,25 +143,26 @@ export default function StudentCheckInPage() {
       return;
     }
 
-    if (!coords) {
-      setIsError(true);
-      setMessage('Потрібна геолокація');
-      return;
-    }
-
     setIsSaving(true);
     setMessage('');
     setIsError(false);
 
     try {
-      const data = await checkIn(token, {
-        qrToken: finalToken,
-        latitude: coords.latitude,
-        longitude: coords.longitude,
-      });
+      const payload = { qrToken: finalToken };
+      if (coords) {
+        payload.latitude = coords.latitude;
+        payload.longitude = coords.longitude;
+      }
+
+      const data = await checkIn(token, payload);
 
       setIsError(false);
-      setMessage(data.message || 'Присутність підтверджено');
+      const checkedAt = data.attendance?.checkedInAt
+        ? ` · час відмітки: ${data.attendance.checkedInAt}`
+        : '';
+      setMessage(
+        `${data.message || 'Присутність підтверджено'}${checkedAt}`
+      );
     } catch (err) {
       setIsError(true);
       const distance = err.data?.distanceMeters;
@@ -191,7 +192,12 @@ export default function StudentCheckInPage() {
 
         <div className="mt-6 grid gap-6 lg:grid-cols-2">
           <div className="rounded-2xl border border-line bg-white p-5">
-            <h2 className="text-lg font-semibold text-ink">Геолокація</h2>
+            <h2 className="text-lg font-semibold text-ink">
+              Геолокація (за потреби)
+            </h2>
+            <p className="mt-1 text-sm text-muted">
+              Потрібна лише якщо викладач увімкнув перевірку місця для пари
+            </p>
 
             <button
               type="button"
@@ -279,7 +285,7 @@ export default function StudentCheckInPage() {
 
           <button
             type="submit"
-            disabled={isSaving || !coords}
+            disabled={isSaving}
             className="mt-4 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white hover:bg-accent-dark disabled:opacity-60"
           >
             {isSaving ? 'Перевірка...' : 'Підтвердити присутність'}

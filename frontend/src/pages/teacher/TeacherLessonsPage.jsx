@@ -121,9 +121,10 @@ export default function TeacherLessonsPage() {
         startTime: form.startTime,
         endTime: form.endTime,
         locationName: form.locationName.trim(),
-        latitude: Number(form.latitude),
-        longitude: Number(form.longitude),
-        radiusMeters: Number(form.radiusMeters),
+        latitude: form.latitude.trim() === '' ? null : Number(form.latitude),
+        longitude: form.longitude.trim() === '' ? null : Number(form.longitude),
+        radiusMeters:
+          form.radiusMeters.trim() === '' ? null : Number(form.radiusMeters),
       });
 
       setSuccess('Заняття створено');
@@ -228,7 +229,14 @@ export default function TeacherLessonsPage() {
           </label>
 
           <div className="sm:col-span-2 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-surface/70 p-4">
-            <p className="text-sm font-medium text-ink">Координати місця заняття</p>
+            <div>
+              <p className="text-sm font-medium text-ink">
+                Геолокація (необовʼязково)
+              </p>
+              <p className="mt-1 text-xs text-muted">
+                Якщо не задати — студенти відмітяться без перевірки місця
+              </p>
+            </div>
             <button
               type="button"
               onClick={fillMyCoordinates}
@@ -247,7 +255,7 @@ export default function TeacherLessonsPage() {
             <input
               value={form.latitude}
               onChange={(event) => updateField('latitude', event.target.value)}
-              required
+              placeholder="Порожньо = без гео"
               className="mt-2 w-full rounded-lg border border-line px-3 py-2.5 outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
             />
           </label>
@@ -257,7 +265,7 @@ export default function TeacherLessonsPage() {
             <input
               value={form.longitude}
               onChange={(event) => updateField('longitude', event.target.value)}
-              required
+              placeholder="Порожньо = без гео"
               className="mt-2 w-full rounded-lg border border-line px-3 py-2.5 outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
             />
           </label>
@@ -269,7 +277,6 @@ export default function TeacherLessonsPage() {
               min="1"
               value={form.radiusMeters}
               onChange={(event) => updateField('radiusMeters', event.target.value)}
-              required
               className="mt-2 w-full rounded-lg border border-line px-3 py-2.5 outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
             />
           </label>

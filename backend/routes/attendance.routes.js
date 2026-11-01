@@ -16,8 +16,8 @@ function toAttendance(row) {
     studentId: row.student_id,
     studentName: row.student_name,
     studentEmail: row.student_email,
-    latitude: Number(row.latitude),
-    longitude: Number(row.longitude),
+    latitude: row.latitude == null ? null : Number(row.latitude),
+    longitude: row.longitude == null ? null : Number(row.longitude),
     checkedInAt: row.checked_in_at,
     lessonDate: row.lesson_date,
     startTime: row.start_time ? String(row.start_time).slice(0, 8) : undefined,
@@ -28,14 +28,26 @@ function toAttendance(row) {
   };
 }
 
+function parseOptionalCoord(value) {
+  if (value === null || value === undefined || String(value).trim() === '') {
+    return null;
+  }
+  const number = Number(value);
+  return Number.isFinite(number) ? number : NaN;
+}
+
+function lessonRequiresGeo(lesson) {
+  return lesson.latitude != null && lesson.longitude != null;
+}
+
 router.post(
   '/attendance/check-in',
   requireAuth,
   requireRole('student'),
   async (req, res) => {
     const qrToken = String(req.body.qrToken || '').trim();
-    const latitude = Number(req.body.latitude);
-    const longitude = Number(req.body.longitude);
+    const latitude = parseOptionalCoord(req.body.latitude);
+    const longitude = parseOptionalCoord(req.body.longitude);
 
     if (!qrToken) {
       return res.status(400).json({
@@ -44,10 +56,20 @@ router.post(
       });
     }
 
-    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+    if (Number.isNaN(latitude) || Number.isNaN(longitude)) {
       return res.status(400).json({
         ok: false,
-        message: 'Потрібні широта і довгота',
+        message: 'Широта і довгота мають бути числами',
+      });
+    }
+
+    if (
+      (latitude === null && longitude !== null) ||
+      (latitude !== null && longitude === null)
+    ) {
+      return res.status(400).json({
+        ok: false,
+        message: 'Передайте обидві координати або жодної',
       });
     }
 
@@ -139,21 +161,30 @@ router.post(
         });
       }
 
-      const geoCheck = isWithinRadius(
-        Number(lesson.latitude),
-        Number(lesson.longitude),
-        latitude,
-        longitude,
-        Number(lesson.radius_meters)
-      );
+      if (lessonRequiresGeo(lesson)) {
+        if (latitude === null || longitude === null) {
+          return res.status(400).json({
+            ok: false,
+            message: 'Для цього заняття потрібна геолокація',
+          });
+        }
 
-      if (!geoCheck.ok) {
-        return res.status(403).json({
-          ok: false,
-          message: 'Ви занадто далеко від місця заняття',
-          distanceMeters: Math.round(geoCheck.distanceMeters),
-          allowedRadiusMeters: geoCheck.allowedRadiusMeters,
-        });
+        const geoCheck = isWithinRadius(
+          Number(lesson.latitude),
+          Number(lesson.longitude),
+          latitude,
+          longitude,
+          Number(lesson.radius_meters || 100)
+        );
+
+        if (!geoCheck.ok) {
+          return res.status(403).json({
+            ok: false,
+            message: 'Ви занадто далеко від місця заняття',
+            distanceMeters: Math.round(geoCheck.distanceMeters),
+            allowedRadiusMeters: geoCheck.allowedRadiusMeters,
+          });
+        }
       }
 
       const [result] = await pool.query(
