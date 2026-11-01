@@ -3,4 +3,5 @@ module.exports = {
   API_PREFIX: '/api',
   JWT_SECRET: process.env.JWT_SECRET || 'edu-attendance-dev-secret',
   JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || '8h',
+  APP_TIMEZONE: process.env.APP_TIMEZONE || process.env.TZ || 'Europe/Kyiv',
 };
