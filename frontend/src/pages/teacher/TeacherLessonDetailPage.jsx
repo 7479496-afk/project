@@ -49,7 +49,7 @@ export default function TeacherLessonDetailPage() {
       setDisciplines(disciplinesData.disciplines || []);
       setForm({
         disciplineId: String(current.disciplineId),
-        groupId: String(current.groupId),
+        groupId: current.groupId ? String(current.groupId) : '',
         lessonDate: current.lessonDate,
         startTime: current.startTime.slice(0, 5),
         endTime: current.endTime.slice(0, 5),
@@ -82,7 +82,7 @@ export default function TeacherLessonDetailPage() {
     try {
       const data = await updateLesson(token, id, {
         disciplineId: Number(form.disciplineId),
-        groupId: Number(form.groupId),
+        groupId: form.groupId ? Number(form.groupId) : null,
         lessonDate: form.lessonDate,
         startTime: form.startTime,
         endTime: form.endTime,
@@ -163,7 +163,7 @@ export default function TeacherLessonDetailPage() {
                   {lesson.disciplineName}
                 </h1>
                 <p className="mt-2 text-muted">
-                  {lesson.groupName} · {lesson.lessonDate} ·{' '}
+                  {lesson.groupName || 'Без групи'} · {lesson.lessonDate} ·{' '}
                   {lesson.startTime.slice(0, 5)}–{lesson.endTime.slice(0, 5)}
                 </p>
                 <p className="mt-1 text-sm text-muted">
@@ -278,13 +278,13 @@ export default function TeacherLessonDetailPage() {
               </label>
 
               <label className="block text-sm font-medium text-ink">
-                Група
+                Група (необовʼязково)
                 <select
                   value={form.groupId}
                   onChange={(event) => updateField('groupId', event.target.value)}
-                  required
                   className="mt-2 w-full rounded-lg border border-line px-3 py-2.5 outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
                 >
+                  <option value="">Без групи (збірна)</option>
                   {groups.map((item) => (
                     <option key={item.id} value={item.id}>
                       {item.name}

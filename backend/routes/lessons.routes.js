@@ -49,7 +49,7 @@ const LESSON_SELECT = `
     l.created_at
   FROM lessons l
   JOIN disciplines d ON d.id = l.discipline_id
-  JOIN study_groups g ON g.id = l.group_id
+  LEFT JOIN study_groups g ON g.id = l.group_id
 `;
 
 function createQrToken() {
@@ -70,7 +70,10 @@ function normalizeTime(value) {
 
 function parseLessonBody(body) {
   const disciplineId = Number(body.disciplineId);
-  const groupId = Number(body.groupId);
+  const groupId =
+    body.groupId === null || body.groupId === undefined || body.groupId === ''
+      ? null
+      : Number(body.groupId);
   const lessonDate = String(body.lessonDate || '').trim();
   const startTimeRaw = String(body.startTime || '').trim();
   const endTimeRaw = String(body.endTime || '').trim();
@@ -86,8 +89,11 @@ function parseLessonBody(body) {
     return { error: 'Потрібно обрати дисципліну' };
   }
 
-  if (!Number.isInteger(groupId) || groupId <= 0) {
-    return { error: 'Потрібно обрати групу' };
+  if (
+    groupId !== null &&
+    (!Number.isInteger(groupId) || groupId <= 0)
+  ) {
+    return { error: 'Невірна група' };
   }
 
   if (!isValidDate(lessonDate)) {
@@ -264,15 +270,17 @@ router.post(
         });
       }
 
-      const [groupRows] = await pool.query(
-        `SELECT id FROM study_groups WHERE id = ? LIMIT 1`,
-        [parsed.groupId]
-      );
-      if (groupRows.length === 0) {
-        return res.status(400).json({
-          ok: false,
-          message: 'Групу не знайдено',
-        });
+      if (parsed.groupId !== null) {
+        const [groupRows] = await pool.query(
+          `SELECT id FROM study_groups WHERE id = ? LIMIT 1`,
+          [parsed.groupId]
+        );
+        if (groupRows.length === 0) {
+          return res.status(400).json({
+            ok: false,
+            message: 'Групу не знайдено',
+          });
+        }
       }
 
       const qrToken = createQrToken();
@@ -343,15 +351,17 @@ router.put(
         });
       }
 
-      const [groupRows] = await pool.query(
-        `SELECT id FROM study_groups WHERE id = ? LIMIT 1`,
-        [parsed.groupId]
-      );
-      if (groupRows.length === 0) {
-        return res.status(400).json({
-          ok: false,
-          message: 'Групу не знайдено',
-        });
+      if (parsed.groupId !== null) {
+        const [groupRows] = await pool.query(
+          `SELECT id FROM study_groups WHERE id = ? LIMIT 1`,
+          [parsed.groupId]
+        );
+        if (groupRows.length === 0) {
+          return res.status(400).json({
+            ok: false,
+            message: 'Групу не знайдено',
+          });
+        }
       }
 
       await pool.query(

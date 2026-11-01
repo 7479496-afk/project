@@ -68,13 +68,6 @@ router.post(
 
       const student = studentRows[0];
 
-      if (!student.group_id) {
-        return res.status(400).json({
-          ok: false,
-          message: 'Студенту не призначено групу',
-        });
-      }
-
       const [lessonRows] = await pool.query(
         `SELECT
            id, group_id, latitude, longitude, radius_meters,
@@ -101,11 +94,20 @@ router.post(
         });
       }
 
-      if (Number(lesson.group_id) !== Number(student.group_id)) {
-        return res.status(403).json({
-          ok: false,
-          message: 'Це заняття для іншої групи',
-        });
+      if (lesson.group_id !== null) {
+        if (!student.group_id) {
+          return res.status(400).json({
+            ok: false,
+            message: 'Студенту не призначено групу',
+          });
+        }
+
+        if (Number(lesson.group_id) !== Number(student.group_id)) {
+          return res.status(403).json({
+            ok: false,
+            message: 'Це заняття для іншої групи',
+          });
+        }
       }
 
       const [existingRows] = await pool.query(
@@ -156,7 +158,7 @@ router.post(
          FROM attendances a
          JOIN lessons l ON l.id = a.lesson_id
          JOIN disciplines d ON d.id = l.discipline_id
-         JOIN study_groups g ON g.id = l.group_id
+         LEFT JOIN study_groups g ON g.id = l.group_id
          JOIN users u ON u.id = a.student_id
          WHERE a.id = ?`,
         [result.insertId]
@@ -200,7 +202,7 @@ router.get(
          FROM attendances a
          JOIN lessons l ON l.id = a.lesson_id
          JOIN disciplines d ON d.id = l.discipline_id
-         JOIN study_groups g ON g.id = l.group_id
+         LEFT JOIN study_groups g ON g.id = l.group_id
          JOIN users u ON u.id = a.student_id
          WHERE a.student_id = ?
          ORDER BY l.lesson_date DESC, l.start_time DESC`,

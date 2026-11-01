@@ -116,7 +116,7 @@ export default function TeacherLessonsPage() {
     try {
       await createLesson(token, {
         disciplineId: Number(form.disciplineId),
-        groupId: Number(form.groupId),
+        groupId: form.groupId ? Number(form.groupId) : null,
         lessonDate: form.lessonDate,
         startTime: form.startTime,
         endTime: form.endTime,
@@ -169,14 +169,13 @@ export default function TeacherLessonsPage() {
           </label>
 
           <label className="block text-sm font-medium text-ink">
-            Група
+            Група (необовʼязково)
             <select
               value={form.groupId}
               onChange={(event) => updateField('groupId', event.target.value)}
-              required
               className="mt-2 w-full rounded-lg border border-line px-3 py-2.5 outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
             >
-              <option value="">Оберіть групу</option>
+              <option value="">Без групи (збірна)</option>
               {groups.map((item) => (
                 <option key={item.id} value={item.id}>
                   {item.name}
@@ -340,7 +339,8 @@ export default function TeacherLessonsPage() {
                 >
                   <div>
                     <p className="font-medium text-ink">
-                      {lesson.disciplineName} · {lesson.groupName}
+                      {lesson.disciplineName} ·{' '}
+                      {lesson.groupName || 'Без групи'}
                       {lesson.isArchived ? (
                         <span className="ml-2 text-xs font-medium text-muted">
                           (архів)

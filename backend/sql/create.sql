@@ -46,7 +46,7 @@ CREATE TABLE disciplines (
 CREATE TABLE lessons (
   id INT UNSIGNED NOT NULL AUTO_INCREMENT,
   discipline_id INT UNSIGNED NOT NULL,
-  group_id INT UNSIGNED NOT NULL,
+  group_id INT UNSIGNED NULL DEFAULT NULL,
   teacher_id INT UNSIGNED NOT NULL,
   lesson_date DATE NOT NULL,
   start_time TIME NOT NULL,
@@ -72,7 +72,7 @@ CREATE TABLE lessons (
   CONSTRAINT fk_lessons_group
     FOREIGN KEY (group_id) REFERENCES study_groups (id)
     ON UPDATE CASCADE
-    ON DELETE RESTRICT,
+    ON DELETE SET NULL,
   CONSTRAINT fk_lessons_teacher
     FOREIGN KEY (teacher_id) REFERENCES users (id)
     ON UPDATE CASCADE
