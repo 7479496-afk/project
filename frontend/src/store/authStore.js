@@ -37,6 +37,12 @@ export const useAuthStore = create((set, get) => ({
         body: { email, password },
       });
 
+      if (!data?.token || !data?.user) {
+        throw new Error(
+          'Некоректна відповідь логіну. Перевірте VITE_API_BASE (URL бекенду).'
+        );
+      }
+
       localStorage.setItem(TOKEN_KEY, data.token);
       localStorage.setItem(USER_KEY, JSON.stringify(data.user));
 
