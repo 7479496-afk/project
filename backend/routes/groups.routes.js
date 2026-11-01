@@ -40,7 +40,7 @@ router.get(
 router.post(
   '/groups',
   requireAuth,
-  requireRole('admin'),
+  requireRole('admin', 'teacher'),
   async (req, res) => {
     const name = String(req.body.name || '').trim();
 

@@ -6,6 +6,7 @@ import DisciplinesPage from './pages/admin/DisciplinesPage';
 import UsersPage from './pages/admin/UsersPage';
 import TeacherLessonsPage from './pages/teacher/TeacherLessonsPage';
 import TeacherLessonDetailPage from './pages/teacher/TeacherLessonDetailPage';
+import TeacherCatalogPage from './pages/teacher/TeacherCatalogPage';
 import TeacherStatsPage from './pages/teacher/TeacherStatsPage';
 import StudentCheckInPage from './pages/student/StudentCheckInPage';
 import StudentHistoryPage from './pages/student/StudentHistoryPage';
@@ -89,6 +90,14 @@ export default function App() {
           element={
             <TeacherRoute>
               <TeacherLessonDetailPage />
+            </TeacherRoute>
+          }
+        />
+        <Route
+          path="/teacher/catalog"
+          element={
+            <TeacherRoute>
+              <TeacherCatalogPage />
             </TeacherRoute>
           }
         />

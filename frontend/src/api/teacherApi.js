@@ -4,8 +4,24 @@ export function getGroups(token) {
   return apiRequest('/groups', { token });
 }
 
+export function createGroup(token, name) {
+  return apiRequest('/groups', {
+    method: 'POST',
+    token,
+    body: { name },
+  });
+}
+
 export function getDisciplines(token) {
   return apiRequest('/disciplines', { token });
+}
+
+export function createDiscipline(token, name) {
+  return apiRequest('/disciplines', {
+    method: 'POST',
+    token,
+    body: { name },
+  });
 }
 
 export function getLessons(token, archived = false) {
