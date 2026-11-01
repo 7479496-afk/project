@@ -10,12 +10,15 @@ const {
 const router = express.Router();
 
 function toAttendance(row) {
+  const isGuest = row.student_id == null;
   return {
     id: row.id,
     lessonId: row.lesson_id,
     studentId: row.student_id,
     studentName: row.student_name,
-    studentEmail: row.student_email,
+    studentEmail: row.student_email || null,
+    guestGroupName: row.guest_group_name || null,
+    isGuest,
     latitude: row.latitude == null ? null : Number(row.latitude),
     longitude: row.longitude == null ? null : Number(row.longitude),
     checkedInAt: row.checked_in_at,
@@ -40,6 +43,122 @@ function lessonRequiresGeo(lesson) {
   return lesson.latitude != null && lesson.longitude != null;
 }
 
+function normalizePersonName(value) {
+  return String(value || '')
+    .trim()
+    .replace(/\s+/g, ' ');
+}
+
+function validateCoordsPair(latitude, longitude) {
+  if (Number.isNaN(latitude) || Number.isNaN(longitude)) {
+    return { error: 'Широта і довгота мають бути числами' };
+  }
+
+  if (
+    (latitude === null && longitude !== null) ||
+    (latitude !== null && longitude === null)
+  ) {
+    return { error: 'Передайте обидві координати або жодної' };
+  }
+
+  return null;
+}
+
+async function findLessonByQrToken(qrToken) {
+  const [lessonRows] = await pool.query(
+    `SELECT
+       id, group_id, latitude, longitude, radius_meters,
+       lesson_date, start_time, end_time, location_name, is_archived
+     FROM lessons
+     WHERE qr_token = ?
+     LIMIT 1`,
+    [qrToken]
+  );
+  return lessonRows[0] || null;
+}
+
+function assertLessonOpenForCheckIn(lesson) {
+  if (Number(lesson.is_archived) === 1) {
+    return {
+      status: 403,
+      body: { ok: false, message: 'Це заняття в архіві' },
+    };
+  }
+
+  const qrWindow = getQrWindowStatus(
+    lesson.lesson_date,
+    lesson.start_time,
+    lesson.end_time
+  );
+
+  if (!qrWindow.ok) {
+    return {
+      status: 403,
+      body: {
+        ok: false,
+        message: qrWindow.message,
+        reason: qrWindow.reason,
+      },
+    };
+  }
+
+  return null;
+}
+
+function assertGeoForLesson(lesson, latitude, longitude) {
+  if (!lessonRequiresGeo(lesson)) {
+    return null;
+  }
+
+  if (latitude === null || longitude === null) {
+    return {
+      status: 400,
+      body: {
+        ok: false,
+        message: 'Для цього заняття потрібна геолокація',
+      },
+    };
+  }
+
+  const geoCheck = isWithinRadius(
+    Number(lesson.latitude),
+    Number(lesson.longitude),
+    latitude,
+    longitude,
+    Number(lesson.radius_meters || 100)
+  );
+
+  if (!geoCheck.ok) {
+    return {
+      status: 403,
+      body: {
+        ok: false,
+        message: 'Ви занадто далеко від місця заняття',
+        distanceMeters: Math.round(geoCheck.distanceMeters),
+        allowedRadiusMeters: geoCheck.allowedRadiusMeters,
+      },
+    };
+  }
+
+  return null;
+}
+
+const ATTENDANCE_SELECT = `
+  SELECT
+    a.id, a.lesson_id, a.student_id, a.guest_full_name, a.guest_group_name,
+    a.latitude, a.longitude, a.checked_in_at,
+    l.lesson_date, l.start_time, l.end_time, l.location_name,
+    d.name AS discipline_name,
+    g.name AS group_name,
+    COALESCE(u.full_name, a.guest_full_name) AS student_name,
+    u.email AS student_email
+  FROM attendances a
+  JOIN lessons l ON l.id = a.lesson_id
+  JOIN disciplines d ON d.id = l.discipline_id
+  LEFT JOIN study_groups g ON g.id = l.group_id
+  LEFT JOIN users u ON u.id = a.student_id
+`;
+
 router.post(
   '/attendance/check-in',
   requireAuth,
@@ -56,21 +175,9 @@ router.post(
       });
     }
 
-    if (Number.isNaN(latitude) || Number.isNaN(longitude)) {
-      return res.status(400).json({
-        ok: false,
-        message: 'Широта і довгота мають бути числами',
-      });
-    }
-
-    if (
-      (latitude === null && longitude !== null) ||
-      (latitude !== null && longitude === null)
-    ) {
-      return res.status(400).json({
-        ok: false,
-        message: 'Передайте обидві координати або жодної',
-      });
+    const coordsError = validateCoordsPair(latitude, longitude);
+    if (coordsError) {
+      return res.status(400).json({ ok: false, message: coordsError.error });
     }
 
     try {
@@ -90,45 +197,18 @@ router.post(
       }
 
       const student = studentRows[0];
+      const lesson = await findLessonByQrToken(qrToken);
 
-      const [lessonRows] = await pool.query(
-        `SELECT
-           id, group_id, latitude, longitude, radius_meters,
-           lesson_date, start_time, end_time, location_name, is_archived
-         FROM lessons
-         WHERE qr_token = ?
-         LIMIT 1`,
-        [qrToken]
-      );
-
-      if (lessonRows.length === 0) {
+      if (!lesson) {
         return res.status(404).json({
           ok: false,
           message: 'Невірний QR-код заняття',
         });
       }
 
-      const lesson = lessonRows[0];
-
-      if (Number(lesson.is_archived) === 1) {
-        return res.status(403).json({
-          ok: false,
-          message: 'Це заняття в архіві',
-        });
-      }
-
-      const qrWindow = getQrWindowStatus(
-        lesson.lesson_date,
-        lesson.start_time,
-        lesson.end_time
-      );
-
-      if (!qrWindow.ok) {
-        return res.status(403).json({
-          ok: false,
-          message: qrWindow.message,
-          reason: qrWindow.reason,
-        });
+      const openError = assertLessonOpenForCheckIn(lesson);
+      if (openError) {
+        return res.status(openError.status).json(openError.body);
       }
 
       if (lesson.group_id !== null) {
@@ -161,52 +241,21 @@ router.post(
         });
       }
 
-      if (lessonRequiresGeo(lesson)) {
-        if (latitude === null || longitude === null) {
-          return res.status(400).json({
-            ok: false,
-            message: 'Для цього заняття потрібна геолокація',
-          });
-        }
-
-        const geoCheck = isWithinRadius(
-          Number(lesson.latitude),
-          Number(lesson.longitude),
-          latitude,
-          longitude,
-          Number(lesson.radius_meters || 100)
-        );
-
-        if (!geoCheck.ok) {
-          return res.status(403).json({
-            ok: false,
-            message: 'Ви занадто далеко від місця заняття',
-            distanceMeters: Math.round(geoCheck.distanceMeters),
-            allowedRadiusMeters: geoCheck.allowedRadiusMeters,
-          });
-        }
+      const geoError = assertGeoForLesson(lesson, latitude, longitude);
+      if (geoError) {
+        return res.status(geoError.status).json(geoError.body);
       }
 
       const [result] = await pool.query(
-        `INSERT INTO attendances (lesson_id, student_id, latitude, longitude)
-         VALUES (?, ?, ?, ?)`,
+        `INSERT INTO attendances (
+           lesson_id, student_id, guest_full_name, guest_group_name,
+           latitude, longitude
+         ) VALUES (?, ?, NULL, NULL, ?, ?)`,
         [lesson.id, student.id, latitude, longitude]
       );
 
       const [rows] = await pool.query(
-        `SELECT
-           a.id, a.lesson_id, a.student_id, a.latitude, a.longitude, a.checked_in_at,
-           l.lesson_date, l.start_time, l.end_time, l.location_name,
-           d.name AS discipline_name,
-           g.name AS group_name,
-           u.full_name AS student_name,
-           u.email AS student_email
-         FROM attendances a
-         JOIN lessons l ON l.id = a.lesson_id
-         JOIN disciplines d ON d.id = l.discipline_id
-         LEFT JOIN study_groups g ON g.id = l.group_id
-         JOIN users u ON u.id = a.student_id
-         WHERE a.id = ?`,
+        `${ATTENDANCE_SELECT} WHERE a.id = ?`,
         [result.insertId]
       );
 
@@ -231,6 +280,98 @@ router.post(
   }
 );
 
+router.post('/attendance/guest-check-in', async (req, res) => {
+  const qrToken = String(req.body.qrToken || '').trim();
+  const guestFullName = normalizePersonName(req.body.fullName);
+  const guestGroupName = normalizePersonName(req.body.groupName) || null;
+  const latitude = parseOptionalCoord(req.body.latitude);
+  const longitude = parseOptionalCoord(req.body.longitude);
+
+  if (!qrToken) {
+    return res.status(400).json({
+      ok: false,
+      message: 'Потрібен QR-код',
+    });
+  }
+
+  if (!guestFullName || guestFullName.length < 2) {
+    return res.status(400).json({
+      ok: false,
+      message: 'Вкажіть імʼя та прізвище',
+    });
+  }
+
+  const coordsError = validateCoordsPair(latitude, longitude);
+  if (coordsError) {
+    return res.status(400).json({ ok: false, message: coordsError.error });
+  }
+
+  try {
+    const lesson = await findLessonByQrToken(qrToken);
+
+    if (!lesson) {
+      return res.status(404).json({
+        ok: false,
+        message: 'Невірний QR-код заняття',
+      });
+    }
+
+    const openError = assertLessonOpenForCheckIn(lesson);
+    if (openError) {
+      return res.status(openError.status).json(openError.body);
+    }
+
+    const [existingRows] = await pool.query(
+      `SELECT id FROM attendances
+       WHERE lesson_id = ? AND guest_full_name = ?
+       LIMIT 1`,
+      [lesson.id, guestFullName]
+    );
+
+    if (existingRows.length > 0) {
+      return res.status(409).json({
+        ok: false,
+        message: 'Присутність з цим ПІБ на занятті вже зареєстровано',
+      });
+    }
+
+    const geoError = assertGeoForLesson(lesson, latitude, longitude);
+    if (geoError) {
+      return res.status(geoError.status).json(geoError.body);
+    }
+
+    const [result] = await pool.query(
+      `INSERT INTO attendances (
+         lesson_id, student_id, guest_full_name, guest_group_name,
+         latitude, longitude
+       ) VALUES (?, NULL, ?, ?, ?, ?)`,
+      [lesson.id, guestFullName, guestGroupName, latitude, longitude]
+    );
+
+    const [rows] = await pool.query(`${ATTENDANCE_SELECT} WHERE a.id = ?`, [
+      result.insertId,
+    ]);
+
+    return res.status(201).json({
+      ok: true,
+      message: 'Присутність успішно зареєстровано',
+      attendance: toAttendance(rows[0]),
+    });
+  } catch (error) {
+    if (error.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({
+        ok: false,
+        message: 'Присутність з цим ПІБ на занятті вже зареєстровано',
+      });
+    }
+    console.error(error);
+    return res.status(500).json({
+      ok: false,
+      message: 'Не вдалося зареєструвати присутність',
+    });
+  }
+});
+
 router.get(
   '/attendance/me',
   requireAuth,
@@ -238,18 +379,7 @@ router.get(
   async (req, res) => {
     try {
       const [rows] = await pool.query(
-        `SELECT
-           a.id, a.lesson_id, a.student_id, a.latitude, a.longitude, a.checked_in_at,
-           l.lesson_date, l.start_time, l.end_time, l.location_name,
-           d.name AS discipline_name,
-           g.name AS group_name,
-           u.full_name AS student_name,
-           u.email AS student_email
-         FROM attendances a
-         JOIN lessons l ON l.id = a.lesson_id
-         JOIN disciplines d ON d.id = l.discipline_id
-         LEFT JOIN study_groups g ON g.id = l.group_id
-         JOIN users u ON u.id = a.student_id
+        `${ATTENDANCE_SELECT}
          WHERE a.student_id = ?
          ORDER BY l.lesson_date DESC, l.start_time DESC`,
         [req.user.id]
@@ -305,11 +435,12 @@ router.get(
 
       const [rows] = await pool.query(
         `SELECT
-           a.id, a.lesson_id, a.student_id, a.latitude, a.longitude, a.checked_in_at,
-           u.full_name AS student_name,
+           a.id, a.lesson_id, a.student_id, a.guest_full_name, a.guest_group_name,
+           a.latitude, a.longitude, a.checked_in_at,
+           COALESCE(u.full_name, a.guest_full_name) AS student_name,
            u.email AS student_email
          FROM attendances a
-         JOIN users u ON u.id = a.student_id
+         LEFT JOIN users u ON u.id = a.student_id
          WHERE a.lesson_id = ?
          ORDER BY a.checked_in_at`,
         [lessonId]

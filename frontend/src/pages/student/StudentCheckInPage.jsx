@@ -7,6 +7,7 @@ import {
   insecureContextMessage,
   isSecureContext,
 } from '../../utils/secureContext';
+import { extractQrToken } from '../../utils/qrToken';
 import { studentNavItems } from './studentNav';
 
 export default function StudentCheckInPage() {
@@ -99,7 +100,7 @@ export default function StudentCheckInPage() {
         { facingMode: 'environment' },
         { fps: 8, qrbox: { width: 220, height: 220 } },
         (decodedText) => {
-          setQrToken(decodedText);
+          setQrToken(extractQrToken(decodedText));
         },
         () => {}
       );
@@ -135,7 +136,7 @@ export default function StudentCheckInPage() {
   async function handleSubmit(event) {
     event.preventDefault();
 
-    const finalToken = qrToken.trim();
+    const finalToken = extractQrToken(qrToken);
 
     if (!finalToken) {
       setIsError(true);
@@ -278,7 +279,9 @@ export default function StudentCheckInPage() {
             QR-код
             <input
               value={qrToken}
-              onChange={(event) => setQrToken(event.target.value)}
+              onChange={(event) =>
+                setQrToken(extractQrToken(event.target.value))
+              }
               className="mt-2 w-full rounded-lg border border-line px-3 py-2.5 outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
             />
           </label>

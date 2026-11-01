@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 
 export default function LoginPage() {
@@ -89,6 +89,16 @@ export default function LoginPage() {
             {isLoading ? 'Вхід...' : 'Увійти'}
           </button>
         </form>
+
+        <p className="mt-4 text-center text-sm text-muted">
+          Студент без акаунта?{' '}
+          <Link
+            to="/check-in"
+            className="font-medium text-accent hover:text-accent-dark"
+          >
+            Відмітитись за QR
+          </Link>
+        </p>
       </div>
     </div>
   );

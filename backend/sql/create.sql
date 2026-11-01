@@ -82,12 +82,15 @@ CREATE TABLE lessons (
 CREATE TABLE attendances (
   id INT UNSIGNED NOT NULL AUTO_INCREMENT,
   lesson_id INT UNSIGNED NOT NULL,
-  student_id INT UNSIGNED NOT NULL,
+  student_id INT UNSIGNED NULL DEFAULT NULL,
+  guest_full_name VARCHAR(150) NULL DEFAULT NULL,
+  guest_group_name VARCHAR(100) NULL DEFAULT NULL,
   latitude DECIMAL(10, 7) NULL DEFAULT NULL,
   longitude DECIMAL(10, 7) NULL DEFAULT NULL,
   checked_in_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   UNIQUE KEY uq_attendances_lesson_student (lesson_id, student_id),
+  UNIQUE KEY uq_attendances_lesson_guest (lesson_id, guest_full_name),
   KEY idx_attendances_student_id (student_id),
   CONSTRAINT fk_attendances_lesson
     FOREIGN KEY (lesson_id) REFERENCES lessons (id)

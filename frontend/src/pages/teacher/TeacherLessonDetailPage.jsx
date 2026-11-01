@@ -13,6 +13,7 @@ import {
   unarchiveLesson,
   updateLesson,
 } from '../../api/teacherApi';
+import { buildCheckInUrl } from '../../utils/qrToken';
 import { teacherNavItems } from './teacherNav';
 
 function getQrStatusLabel(lesson) {
@@ -255,8 +256,11 @@ export default function TeacherLessonDetailPage() {
                   {String(lesson.endTime).slice(0, 5)})
                 </p>
                 <div className="mt-4 flex justify-center">
-                  <QRCodeSVG value={lesson.qrToken} size={200} />
+                  <QRCodeSVG value={buildCheckInUrl(lesson.qrToken)} size={200} />
                 </div>
+                <p className="mt-3 break-all text-xs text-muted">
+                  {buildCheckInUrl(lesson.qrToken)}
+                </p>
               </div>
 
               <div className="rounded-2xl border border-line bg-white">
@@ -275,8 +279,21 @@ export default function TeacherLessonDetailPage() {
                   <ul className="divide-y divide-line">
                     {attendances.map((item) => (
                       <li key={item.id} className="px-4 py-3">
-                        <p className="font-medium text-ink">{item.studentName}</p>
-                        <p className="text-sm text-muted">{item.studentEmail}</p>
+                        <p className="font-medium text-ink">
+                          {item.studentName}
+                          {item.isGuest ? (
+                            <span className="ml-2 text-xs font-medium text-muted">
+                              (без акаунта)
+                            </span>
+                          ) : null}
+                        </p>
+                        <p className="text-sm text-muted">
+                          {item.isGuest
+                            ? item.guestGroupName
+                              ? `Група: ${item.guestGroupName}`
+                              : 'Групу не вказано'
+                            : item.studentEmail}
+                        </p>
                         <p className="mt-1 text-sm text-ink">
                           Час відмітки: {item.checkedInAt}
                         </p>

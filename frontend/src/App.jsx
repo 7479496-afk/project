@@ -9,6 +9,7 @@ import TeacherLessonDetailPage from './pages/teacher/TeacherLessonDetailPage';
 import TeacherStatsPage from './pages/teacher/TeacherStatsPage';
 import StudentCheckInPage from './pages/student/StudentCheckInPage';
 import StudentHistoryPage from './pages/student/StudentHistoryPage';
+import GuestCheckInPage from './pages/GuestCheckInPage';
 import { useAuthStore } from './store/authStore';
 
 function HomeRedirect() {
@@ -40,6 +41,7 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/check-in" element={<GuestCheckInPage />} />
 
         <Route
           path="/admin"
