@@ -462,6 +462,192 @@ router.get(
 );
 
 router.get(
+  '/attendance/journal',
+  requireAuth,
+  requireRole('teacher'),
+  async (req, res) => {
+    const disciplineIdRaw = req.query.disciplineId;
+    const disciplineId =
+      disciplineIdRaw === undefined || disciplineIdRaw === ''
+        ? null
+        : Number(disciplineIdRaw);
+
+    if (
+      disciplineIdRaw !== undefined &&
+      disciplineIdRaw !== '' &&
+      (!Number.isInteger(disciplineId) || disciplineId <= 0)
+    ) {
+      return res.status(400).json({
+        ok: false,
+        message: 'Невірний id дисципліни',
+      });
+    }
+
+    try {
+      const lessonParams = [req.user.id];
+      let disciplineFilter = '';
+
+      if (disciplineId !== null) {
+        disciplineFilter = ' AND l.discipline_id = ?';
+        lessonParams.push(disciplineId);
+      }
+
+      const [lessonRows] = await pool.query(
+        `SELECT
+           l.id,
+           l.discipline_id,
+           d.name AS discipline_name,
+           l.group_id,
+           g.name AS group_name,
+           l.lesson_date,
+           l.start_time,
+           l.end_time,
+           l.is_archived
+         FROM lessons l
+         JOIN disciplines d ON d.id = l.discipline_id
+         LEFT JOIN study_groups g ON g.id = l.group_id
+         WHERE l.teacher_id = ?${disciplineFilter}
+         ORDER BY l.lesson_date ASC, l.start_time ASC, l.id ASC`,
+        lessonParams
+      );
+
+      const lessons = lessonRows.map((row) => ({
+        id: row.id,
+        disciplineId: row.discipline_id,
+        disciplineName: row.discipline_name,
+        groupId: row.group_id,
+        groupName: row.group_name,
+        lessonDate: row.lesson_date,
+        startTime: String(row.start_time).slice(0, 8),
+        endTime: String(row.end_time).slice(0, 8),
+        isArchived: Boolean(row.is_archived),
+      }));
+
+      if (lessons.length === 0) {
+        return res.json({
+          ok: true,
+          lessons: [],
+          people: [],
+        });
+      }
+
+      const lessonIds = lessons.map((lesson) => lesson.id);
+      const placeholders = lessonIds.map(() => '?').join(', ');
+
+      const [attendanceRows] = await pool.query(
+        `SELECT
+           a.lesson_id,
+           a.student_id,
+           a.guest_full_name,
+           a.guest_group_name,
+           a.checked_in_at,
+           COALESCE(u.full_name, a.guest_full_name) AS person_name,
+           u.email AS student_email,
+           sg.name AS student_group_name
+         FROM attendances a
+         LEFT JOIN users u ON u.id = a.student_id
+         LEFT JOIN study_groups sg ON sg.id = u.group_id
+         WHERE a.lesson_id IN (${placeholders})
+         ORDER BY a.checked_in_at ASC`,
+        lessonIds
+      );
+
+      const groupIds = [
+        ...new Set(
+          lessons
+            .map((lesson) => lesson.groupId)
+            .filter((id) => id != null)
+        ),
+      ];
+
+      let rosterRows = [];
+      if (groupIds.length > 0) {
+        const groupPlaceholders = groupIds.map(() => '?').join(', ');
+        const [rows] = await pool.query(
+          `SELECT
+             u.id AS student_id,
+             u.full_name AS person_name,
+             u.email AS student_email,
+             u.group_id,
+             g.name AS group_name
+           FROM users u
+           JOIN study_groups g ON g.id = u.group_id
+           WHERE u.role = 'student' AND u.group_id IN (${groupPlaceholders})
+           ORDER BY g.name, u.full_name`,
+          groupIds
+        );
+        rosterRows = rows;
+      }
+
+      const peopleMap = new Map();
+
+      function ensurePerson(key, data) {
+        if (!peopleMap.has(key)) {
+          peopleMap.set(key, {
+            key,
+            name: data.name,
+            email: data.email || null,
+            groupName: data.groupName || null,
+            isGuest: Boolean(data.isGuest),
+            marks: {},
+          });
+        }
+        return peopleMap.get(key);
+      }
+
+      for (const row of rosterRows) {
+        ensurePerson(`s:${row.student_id}`, {
+          name: row.person_name,
+          email: row.student_email,
+          groupName: row.group_name,
+          isGuest: false,
+        });
+      }
+
+      for (const row of attendanceRows) {
+        const key =
+          row.student_id != null
+            ? `s:${row.student_id}`
+            : `g:${String(row.guest_full_name || '').trim().toLowerCase()}`;
+
+        const person = ensurePerson(key, {
+          name: row.person_name,
+          email: row.student_email,
+          groupName: row.student_group_name || row.guest_group_name,
+          isGuest: row.student_id == null,
+        });
+
+        person.marks[row.lesson_id] = {
+          present: true,
+          checkedInAt: row.checked_in_at,
+        };
+      }
+
+      const people = [...peopleMap.values()].sort((a, b) => {
+        const groupCmp = String(a.groupName || '').localeCompare(
+          String(b.groupName || ''),
+          'uk'
+        );
+        if (groupCmp !== 0) return groupCmp;
+        return String(a.name || '').localeCompare(String(b.name || ''), 'uk');
+      });
+
+      return res.json({
+        ok: true,
+        lessons,
+        people,
+      });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({
+        ok: false,
+        message: 'Не вдалося завантажити журнал відвідуваності',
+      });
+    }
+  }
+);
+
+router.get(
   '/attendance/stats',
   requireAuth,
   requireRole('teacher'),

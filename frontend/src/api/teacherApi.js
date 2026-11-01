@@ -80,3 +80,10 @@ export function getAttendanceStats(token, disciplineId) {
     : '';
   return apiRequest(`/attendance/stats${query}`, { token });
 }
+
+export function getAttendanceJournal(token, disciplineId) {
+  const query = disciplineId
+    ? `?disciplineId=${encodeURIComponent(disciplineId)}`
+    : '';
+  return apiRequest(`/attendance/journal${query}`, { token });
+}
