@@ -15,6 +15,33 @@ import {
 } from '../../api/teacherApi';
 import { teacherNavItems } from './teacherNav';
 
+function getQrStatusLabel(lesson) {
+  if (!lesson) return '';
+  if (lesson.isArchived) return 'В архіві — відмітка недоступна';
+
+  const start = new Date(
+    `${lesson.lessonDate}T${String(lesson.startTime).slice(0, 8)}`
+  );
+  const end = new Date(
+    `${lesson.lessonDate}T${String(lesson.endTime).slice(0, 8)}`
+  );
+  const now = new Date();
+
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    return 'Невірний час заняття';
+  }
+
+  if (now < start) {
+    return `Ще неактивний · діє з ${String(lesson.startTime).slice(0, 5)} до ${String(lesson.endTime).slice(0, 5)}`;
+  }
+
+  if (now > end) {
+    return 'Неактивний · час пари закінчився';
+  }
+
+  return `Активний · до ${String(lesson.endTime).slice(0, 5)}`;
+}
+
 export default function TeacherLessonDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -216,9 +243,14 @@ export default function TeacherLessonDetailPage() {
             <div className="mt-6 grid gap-6 lg:grid-cols-[280px_1fr]">
               <div className="rounded-2xl border border-line bg-white p-5 text-center">
                 <h2 className="text-lg font-semibold text-ink">QR-код заняття</h2>
-                {lesson.isArchived ? (
-                  <p className="mt-1 text-sm text-muted">В архіві</p>
-                ) : null}
+                <p className="mt-1 text-sm text-muted">
+                  {getQrStatusLabel(lesson)}
+                </p>
+                <p className="mt-1 text-xs text-muted">
+                  Відмітка лише під час пари (
+                  {String(lesson.startTime).slice(0, 5)}–
+                  {String(lesson.endTime).slice(0, 5)})
+                </p>
                 <div className="mt-4 flex justify-center">
                   <QRCodeSVG value={lesson.qrToken} size={200} />
                 </div>

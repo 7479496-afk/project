@@ -1,6 +1,7 @@
 const express = require('express');
 const { pool } = require('../db/pool');
 const { isWithinRadius } = require('../utils/geo');
+const { getQrWindowStatus } = require('../utils/qrWindow');
 const {
   requireAuth,
   requireRole,
@@ -71,7 +72,7 @@ router.post(
       const [lessonRows] = await pool.query(
         `SELECT
            id, group_id, latitude, longitude, radius_meters,
-           lesson_date, location_name, is_archived
+           lesson_date, start_time, end_time, location_name, is_archived
          FROM lessons
          WHERE qr_token = ?
          LIMIT 1`,
@@ -91,6 +92,20 @@ router.post(
         return res.status(403).json({
           ok: false,
           message: 'Це заняття в архіві',
+        });
+      }
+
+      const qrWindow = getQrWindowStatus(
+        lesson.lesson_date,
+        lesson.start_time,
+        lesson.end_time
+      );
+
+      if (!qrWindow.ok) {
+        return res.status(403).json({
+          ok: false,
+          message: qrWindow.message,
+          reason: qrWindow.reason,
         });
       }
 
