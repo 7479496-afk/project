@@ -8,9 +8,76 @@ import {
 } from '../../api/teacherApi';
 import { teacherNavItems } from './teacherNav';
 
+// Same tones as journal on site (Tailwind emerald-200 / sky-200)
+const DATE_FILL_EMERALD = 'A7F3D0';
+const DATE_FILL_SKY = 'BAE6FD';
+const PRESENT_FONT = '16A34A';
+const HEADER_FONT = '0F172A';
+
 function dateToneClass(date, dateIndexMap) {
   const index = dateIndexMap.get(date) ?? 0;
   return index % 2 === 0 ? 'bg-emerald-200' : 'bg-sky-200';
+}
+
+function dateFillHex(date, dateIndexMap) {
+  const index = dateIndexMap.get(date) ?? 0;
+  return index % 2 === 0 ? DATE_FILL_EMERALD : DATE_FILL_SKY;
+}
+
+function formatLessonHeader(lesson) {
+  const date = String(lesson.lessonDate || '');
+  const [year, month, day] = date.split('-');
+  const dateUa =
+    year && month && day ? `${day}.${month}.${year}` : date;
+  return `${dateUa} ${String(lesson.startTime).slice(0, 5)}`;
+}
+
+function formatCheckInTime(checkedInAt) {
+  if (!checkedInAt) return '+';
+  const raw = String(checkedInAt);
+  const timePart = raw.includes('T')
+    ? raw.slice(11, 16)
+    : raw.includes(' ')
+      ? raw.split(' ')[1]?.slice(0, 5)
+      : raw.slice(0, 5);
+  return timePart || '+';
+}
+
+function applyFill(cell, argb) {
+  cell.fill = {
+    type: 'pattern',
+    pattern: 'solid',
+    fgColor: { argb: `FF${argb}` },
+  };
+}
+
+function csvEscape(value) {
+  const text = String(value ?? '');
+  if (/[",\n;]/.test(text)) {
+    return `"${text.replace(/"/g, '""')}"`;
+  }
+  return text;
+}
+
+function asCsvExcelText(value) {
+  if (value === '' || value == null) return '';
+  return `="${String(value).replace(/"/g, '""')}"`;
+}
+
+function safeJournalFileName(disciplineName) {
+  return (disciplineName || 'journal').replace(
+    /[^\wа-яА-ЯіїєґІЇЄҐ\- ]+/g,
+    '_'
+  );
+}
+
+function downloadBlob(blob, fileName) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = fileName;
+  link.click();
+  URL.revokeObjectURL(url);
 }
 
 export default function TeacherJournalPage() {
@@ -101,15 +168,182 @@ export default function TeacherJournalPage() {
     return map;
   }, [lessons]);
 
+  async function exportExcel() {
+    const ExcelJS = (await import('exceljs')).default;
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Журнал', {
+      views: [{ state: 'frozen', xSplit: 1, ySplit: 1 }],
+    });
+
+    const headers = [
+      'Прізвище Імʼя',
+      'Група',
+      'Тип',
+      ...lessons.map((lesson) => formatLessonHeader(lesson)),
+      'Разом',
+    ];
+
+    const headerRow = sheet.addRow(headers);
+    headerRow.font = { bold: true, color: { argb: `FF${HEADER_FONT}` } };
+    headerRow.eachCell((cell) => {
+      cell.alignment = {
+        horizontal: 'center',
+        vertical: 'middle',
+        wrapText: true,
+      };
+    });
+
+    lessons.forEach((lesson, index) => {
+      const cell = headerRow.getCell(4 + index);
+      applyFill(cell, dateFillHex(lesson.lessonDate, dateIndexMap));
+    });
+
+    for (const person of people) {
+      const marks = lessons.map((lesson) => {
+        const mark = person.marks?.[lesson.id];
+        if (!mark?.present) return '—';
+        return formatCheckInTime(mark.checkedInAt);
+      });
+      const presentCount = marks.filter((value) => value !== '—').length;
+
+      const row = sheet.addRow([
+        person.name,
+        person.groupName || '—',
+        person.isGuest ? 'без акаунта' : 'студент',
+        ...marks,
+        `${presentCount} з ${lessons.length}`,
+      ]);
+
+      row.eachCell((cell) => {
+        cell.font = { color: { argb: `FF${HEADER_FONT}` } };
+        cell.alignment = {
+          horizontal: 'center',
+          vertical: 'middle',
+        };
+      });
+
+      row.getCell(1).font = {
+        bold: true,
+        color: { argb: `FF${HEADER_FONT}` },
+      };
+      row.getCell(4 + lessons.length).font = {
+        bold: true,
+        color: { argb: `FF${HEADER_FONT}` },
+      };
+
+      lessons.forEach((lesson, index) => {
+        const cell = row.getCell(4 + index);
+        applyFill(cell, dateFillHex(lesson.lessonDate, dateIndexMap));
+        const mark = person.marks?.[lesson.id];
+        if (mark?.present) {
+          cell.font = {
+            bold: true,
+            color: { argb: `FF${PRESENT_FONT}` },
+          };
+        }
+      });
+    }
+
+    sheet.getColumn(1).width = 28;
+    sheet.getColumn(2).width = 12;
+    sheet.getColumn(3).width = 14;
+    lessons.forEach((_, index) => {
+      sheet.getColumn(4 + index).width = 16;
+    });
+    sheet.getColumn(4 + lessons.length).width = 12;
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+    downloadBlob(
+      blob,
+      `journal_${safeJournalFileName(selectedDisciplineName)}.xlsx`
+    );
+  }
+
+  function exportCsv() {
+    const header = [
+      'Прізвище Імʼя',
+      'Група',
+      'Тип',
+      ...lessons.map((lesson) => asCsvExcelText(formatLessonHeader(lesson))),
+      'Разом',
+    ];
+
+    const rows = people.map((person) => {
+      const marks = lessons.map((lesson) => {
+        const mark = person.marks?.[lesson.id];
+        if (!mark?.present) return '';
+        return asCsvExcelText(formatCheckInTime(mark.checkedInAt));
+      });
+      const presentCount = marks.filter(Boolean).length;
+      return [
+        person.name,
+        person.groupName || '',
+        person.isGuest ? 'без акаунта' : 'студент',
+        ...marks,
+        asCsvExcelText(`${presentCount} з ${lessons.length}`),
+      ];
+    });
+
+    const lines = [header, ...rows]
+      .map((row) => row.map(csvEscape).join(';'))
+      .join('\n');
+
+    const blob = new Blob([`\uFEFF${lines}`], {
+      type: 'text/csv;charset=utf-8;',
+    });
+    downloadBlob(
+      blob,
+      `journal_${safeJournalFileName(selectedDisciplineName)}.csv`
+    );
+  }
+
+  const canExport =
+    !isLoading && lessons.length > 0 && people.length > 0;
+
   return (
     <AppShell title="Панель викладача" navItems={teacherNavItems}>
       <section>
-        <h1 className="text-2xl font-semibold text-ink">
-          Журнал відвідуваності
-        </h1>
-        <p className="mt-2 text-sm text-muted">
-          Таблиця по датах: хто був і коли відмітився.
-        </p>
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-semibold text-ink">
+              Журнал відвідуваності
+            </h1>
+            <p className="mt-2 text-sm text-muted">
+              Таблиця по датах: хто був і коли відмітився.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                exportExcel().catch((err) => {
+                  setError(err.message || 'Не вдалося сформувати Excel');
+                });
+              }}
+              disabled={!canExport}
+              className="rounded-lg border border-line bg-white px-3 py-2 text-sm font-medium text-ink hover:bg-surface disabled:opacity-60"
+            >
+              Excel (.xlsx)
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                try {
+                  exportCsv();
+                } catch (err) {
+                  setError(err.message || 'Не вдалося сформувати CSV');
+                }
+              }}
+              disabled={!canExport}
+              className="rounded-lg border border-line bg-white px-3 py-2 text-sm font-medium text-ink hover:bg-surface disabled:opacity-60"
+            >
+              CSV
+            </button>
+          </div>
+        </div>
 
         <label className="mt-6 block max-w-md text-sm font-medium text-ink">
           Дисципліна
@@ -159,7 +393,7 @@ export default function TeacherJournalPage() {
                     <th className="sticky left-0 z-10 bg-white px-3 py-2 font-semibold text-ink">
                       ПІБ
                     </th>
-                    <th className="bg-white px-3 py-2 font-semibold text-ink">
+                    <th className="bg-white px-3 py-2 text-center font-semibold text-ink">
                       Група
                     </th>
                     {lessons.map((lesson) => (
@@ -181,7 +415,7 @@ export default function TeacherJournalPage() {
                         </div>
                       </th>
                     ))}
-                    <th className="bg-white px-3 py-2 font-semibold text-ink">
+                    <th className="bg-white px-3 py-2 text-center font-semibold text-ink">
                       Разом
                     </th>
                   </tr>
@@ -202,7 +436,7 @@ export default function TeacherJournalPage() {
                             </span>
                           ) : null}
                         </td>
-                        <td className="px-3 py-2 text-muted">
+                        <td className="px-3 py-2 text-center text-muted">
                           {person.groupName || '—'}
                         </td>
                         {lessons.map((lesson) => {
@@ -231,7 +465,7 @@ export default function TeacherJournalPage() {
                             </td>
                           );
                         })}
-                        <td className="px-3 py-2 font-medium text-ink">
+                        <td className="px-3 py-2 text-center font-medium text-ink">
                           {presentCount}/{lessons.length}
                         </td>
                       </tr>
