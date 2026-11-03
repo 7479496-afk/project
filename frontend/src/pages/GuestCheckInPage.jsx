@@ -148,7 +148,7 @@ export default function GuestCheckInPage() {
 
     if (!name) {
       setIsError(true);
-      setMessage('Вкажіть імʼя та прізвище');
+      setMessage('Вкажіть прізвище та імʼя');
       return;
     }
 
@@ -206,7 +206,7 @@ export default function GuestCheckInPage() {
             Відмітка без реєстрації
           </h1>
           <p className="mt-1 text-sm text-muted">
-            Відскануйте QR, введіть ПІБ — акаунт не потрібен
+            Відскануйте QR, введіть прізвище та імʼя — акаунт не потрібен
           </p>
         </div>
         <Link
@@ -228,12 +228,12 @@ export default function GuestCheckInPage() {
         className="grid gap-4 rounded-2xl border border-line bg-white p-5"
       >
         <label className="block text-sm font-medium text-ink">
-          Імʼя та прізвище
+          Прізвище та імʼя
           <input
             value={fullName}
             onChange={(event) => setFullName(event.target.value)}
             required
-            placeholder="Наприклад, Андрій Петренко"
+            placeholder="Наприклад, Петренко Андрій"
             className="mt-2 w-full rounded-lg border border-line px-3 py-2.5 outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
           />
         </label>

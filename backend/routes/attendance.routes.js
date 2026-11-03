@@ -297,7 +297,7 @@ router.post('/attendance/guest-check-in', async (req, res) => {
   if (!guestFullName || guestFullName.length < 2) {
     return res.status(400).json({
       ok: false,
-      message: 'Вкажіть імʼя та прізвище',
+      message: 'Вкажіть прізвище та імʼя',
     });
   }
 
