@@ -2,6 +2,7 @@ const express = require('express');
 const { pool } = require('../db/pool');
 const { isWithinRadius } = require('../utils/geo');
 const { getQrWindowStatus } = require('../utils/qrWindow');
+const { formatInTimeZone } = require('../utils/dateTime');
 const {
   requireAuth,
   requireRole,
@@ -21,7 +22,7 @@ function toAttendance(row) {
     isGuest,
     latitude: row.latitude == null ? null : Number(row.latitude),
     longitude: row.longitude == null ? null : Number(row.longitude),
-    checkedInAt: row.checked_in_at,
+    checkedInAt: formatInTimeZone(row.checked_in_at),
     lessonDate: row.lesson_date,
     startTime: row.start_time ? String(row.start_time).slice(0, 8) : undefined,
     endTime: row.end_time ? String(row.end_time).slice(0, 8) : undefined,
@@ -619,7 +620,7 @@ router.get(
 
         person.marks[row.lesson_id] = {
           present: true,
-          checkedInAt: row.checked_in_at,
+          checkedInAt: formatInTimeZone(row.checked_in_at),
         };
       }
 
